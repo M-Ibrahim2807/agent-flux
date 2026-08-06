@@ -1,26 +1,43 @@
-import streamlit as st
 from pathlib import Path
-import streamlit.components.v1 as components
 import base64
+import mimetypes
 
-st.set_page_config(
-    page_title="Agent Flux",
-    layout="wide"
-)
+import streamlit as st
+import streamlit.components.v1 as components
 
-folder = Path(__file__).parent
 
-html = (folder / "index.html").read_text(encoding="utf-8")
+st.set_page_config(page_title="Agent Flux", layout="wide")
 
-# Convert local images to base64
-for image in (folder / "images").glob("*"):
-    if image.suffix.lower() in [".png",".jpg",".jpeg",".webp"]:
-        with open(image, "rb") as img:
-            encoded = base64.b64encode(img.read()).decode()
+ROOT = Path(__file__).parent
+PAGES = {
+    "Home": "index.html",
+    "Why Choose Us": "about.html",
+    "Employers": "employers.html",
+    "Candidates": "candidates.html",
+    "Jobs": "jobs.html",
+    "Partners": "partners.html",
+    "Contact": "contact.html",
+}
 
-        html = html.replace(
-            f"images/{image.name}",
-            f"data:image/{image.suffix[1:]};base64,{encoded}"
-        )
 
-components.html(html, height=2000, scrolling=True)
+def data_uri(path: Path) -> str:
+    mime = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
+    return f"data:{mime};base64,{base64.b64encode(path.read_bytes()).decode()}"
+
+
+def inline_static(html: str) -> str:
+    css = (ROOT / "css" / "style.css").read_text(encoding="utf-8")
+    js = (ROOT / "js" / "script.js").read_text(encoding="utf-8")
+    html = html.replace('<link rel="stylesheet" href="css/style.css">', f"<style>{css}</style>")
+    html = html.replace('<script src="js/script.js" defer></script>', f"<script>{js}</script>")
+
+    for asset in (ROOT / "images").rglob("*"):
+        if asset.is_file():
+            html = html.replace(f"images/{asset.relative_to(ROOT / 'images').as_posix()}", data_uri(asset))
+
+    return html
+
+
+choice = st.sidebar.radio("Preview page", list(PAGES))
+source = (ROOT / PAGES[choice]).read_text(encoding="utf-8")
+components.html(inline_static(source), height=2400, scrolling=True)
